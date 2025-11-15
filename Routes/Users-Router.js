@@ -3,7 +3,8 @@ const verifyToken = require('../middleware/verifyToken');
 const express = require('express')
 const router = express.Router()
 const userController = require('../Controlls/Users-api')
-const multer = require('multer')
+const multer = require('multer');
+const userRole = require('../Utility/user_roles');
 const diskStorage = multer.diskStorage({
     destination: function (req, file, cb) {
         console.log('file', file);
@@ -20,7 +21,7 @@ const upload = multer({ storage: diskStorage })
 //register
 //Login
 router.route('/')
-    .get(verifyToken, userController.getAllUsers)
+    .get(verifyToken, userController.getAllUsers.allowedTo(userRole.ADMIN, userRole.MANEGER))
 
 router.route('/login')
     .post(userController.Login)
