@@ -25,7 +25,11 @@ router.route('/')
     .delete(verifyToken, userController.deleteUserID.allowedTo(userRole.MANEGER))
 
 router.route('/:userId')
-.delete(verifyToken, userController.deleteUserID.allowedTo(userRole.MANEGER))
+    .delete(
+        verifyToken,
+        allowedTo(userRole.MANEGER),
+        userController.deleteUserID
+    );
 
 router.route('/login')
     .post(userController.Login)
