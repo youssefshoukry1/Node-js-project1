@@ -32,7 +32,6 @@ const addCourse = async (req, res) => {
     try {
         const new_course = await new Course(req.body).save()
                 console.log(new_course);
-
         return res.status(201).json(new_course)
         
     } catch (err) {

@@ -21,6 +21,15 @@ const getAllUsers = async (req, res) => {
         return res.status(404).json({ msg: ' not found' })
     }
 }
+const deleteUserID = async (req, res) => {
+    const userId = req.params.userId;
+    try {
+        const DeleteUser = await User.deleteOne({ _id: userId })
+        return res.status(200).json(DeleteUser)
+    } catch (err) {
+        return res.status(400).json({ msg: 'cant delete the user' })
+    }
+}
 
 const Register = async (req, res) => {
     console.log(req.body);
