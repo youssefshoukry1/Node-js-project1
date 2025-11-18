@@ -77,5 +77,6 @@ const Login = async (req, res) => {
 module.exports = {
     getAllUsers,
     Register,
-    Login
+    Login,
+    deleteUserID
 }
