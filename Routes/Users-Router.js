@@ -2,9 +2,13 @@ const { body } = require('express-validator');
 const verifyToken = require('../middleware/verifyToken');
 const express = require('express')
 const router = express.Router()
-const userController = require('../Controlls/Users-api')
+const userController = require('../Controlls/Users-api');
+const allowedTo = require('../middleware/allowedTo')
 const multer = require('multer');
 const userRole = require('../Utility/user_roles');
+
+
+
 const diskStorage = multer.diskStorage({
     destination: function (req, file, cb) {
         console.log('file', file);
