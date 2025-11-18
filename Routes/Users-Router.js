@@ -28,7 +28,7 @@ router.route('/')
     .get(verifyToken, allowedTo(userRole.ADMIN, userRole.MANEGER), userController.getAllUsers)
     .delete(
         verifyToken,
-        allowedTo(userRole.ADMIN),
+        allowedTo(userRole.ADMIN, userRole.MANEGER),
         userController.deletAllUsers
     );
 
