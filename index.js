@@ -41,23 +41,33 @@
 /////////////////////////////////////CURD App////////////////////////////////////////
 
 require('dotenv').config();
-const express = require('express')
-const app = express();
+const express = require('express');
 const mongoose = require('mongoose');
+const cors = require('cors');
+const coursesRouter = require('./Routes/Course-Router');
+const usersRouter = require('./Routes/Users-Router');
+
+const app = express();
 const url = process.env.MONGO_URL;
-const cors = require('cors'); //عشان يسمح للفرونت انو يتصل بالباك اند
 
-app.use(express.static('/uploads',express.static('uploads')))
-
-mongoose.connect(url).then(() => {
-    console.log('mongoos started');
-    })
+// ================= Middleware =================
 app.use(express.json());
-app.use(cors())
-const coursesRouter = require('./Routes/Course-Router')
-const usersRouter = require('./Routes/Users-Router')
-app.use('/api/courses', coursesRouter)
-app.use('/api/users', usersRouter)
-app.listen(process.env.PORT || 4000, () => {
-    console.log("localhost:4000")
-})
+app.use(cors({
+  origin: "http://localhost:3000",
+  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+app.use('/uploads', express.static('uploads'));
+
+// ================= DB =================
+mongoose.connect(url)
+  .then(() => console.log('MongoDB started'))
+  .catch(err => console.log('MongoDB connection error:', err));
+
+// ================= Routes =================
+app.use('/api/courses', coursesRouter);
+app.use('/api/users', usersRouter);
+
+// ================= Server =================
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
