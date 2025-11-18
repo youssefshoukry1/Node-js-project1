@@ -26,13 +26,20 @@ const upload = multer({ storage: diskStorage })
 //Login
 router.route('/')
     .get(verifyToken, allowedTo(userRole.ADMIN, userRole.MANEGER), userController.getAllUsers)
-    .delete(verifyToken, allowedTo(userRole.ADMIN, userRole.MANEGER), userController.deleteUserID,)
+
 
 router.route('/:userId')
     .delete(
         verifyToken,
         allowedTo(userRole.MANEGER),
         userController.deleteUserID
+    );
+
+    router.route('/delete')
+    .delete(
+        verifyToken,
+        allowedTo(userRole.ADMIN),
+        userController.deletAllUsers
     );
 
 router.route('/login')

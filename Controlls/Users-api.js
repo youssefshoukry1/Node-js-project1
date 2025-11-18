@@ -30,6 +30,14 @@ const deleteUserID = async (req, res) => {
         return res.status(400).json({ msg: 'cant delete the user' })
     }
 }
+const deletAllUsers = async (req, res) => {
+    try {
+        const DeleteAllUsers = await User.deleteMany({})
+        return res.status(200).json(DeleteAllUsers)
+    } catch {
+        return res.status(400).json({ msg: 'cant delete all users' })
+    }
+}
 
 const Register = async (req, res) => {
     console.log(req.body);
@@ -78,5 +86,6 @@ module.exports = {
     getAllUsers,
     Register,
     Login,
-    deleteUserID
+    deleteUserID,
+    deletAllUsers
 }
