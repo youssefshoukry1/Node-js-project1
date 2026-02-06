@@ -56,7 +56,8 @@ const createOrder = async (req, res) => {
             }
         })
 
-        const lastOrder = await Order.findOne().sort({ orderNumber: -1 }).lean()
+        const institutionId = req.body.institutionId
+        const lastOrder = await Order.findOne({ institutionId }).sort({ orderNumber: -1 }).lean()
         const orderNumber = lastOrder ? lastOrder.orderNumber + 1 : 1
 
         const order = await Order.create({
