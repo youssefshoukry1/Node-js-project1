@@ -14,17 +14,18 @@ const createOrder = async (req, res) => {
             return res.status(400).json({ message: 'Order must have at least one item' })
         }
 
-        const drinkIds = items.map(i => i.drinkId)
+        // Deduplicate IDs to handle multiple items of the same drink (e.g. Small & Large of same Coffee)
+        const uniqueDrinkIds = [...new Set(items.map(i => i.drinkId))]
 
         const drinks = await Drink.find({
-            _id: { $in: drinkIds },
+            _id: { $in: uniqueDrinkIds },
             isAvailable: true
         }).lean()
 
-        if (drinks.length !== drinkIds.length) {
-            // Debugging: help identify which one is missing
+        if (drinks.length !== uniqueDrinkIds.length) {
+            // Debugging
             const foundIds = drinks.map(d => d._id.toString())
-            const missing = drinkIds.filter(id => !foundIds.includes(String(id)))
+            const missing = uniqueDrinkIds.filter(id => !foundIds.includes(String(id)))
             return res.status(400).json({ message: 'One or more drinks are not available', missingIds: missing })
         }
 
