@@ -60,6 +60,8 @@ const createOrder = async (req, res) => {
         const lastOrder = await Order.findOne({ institutionId }).sort({ orderNumber: -1 }).lean()
         const orderNumber = lastOrder ? lastOrder.orderNumber + 1 : 1
 
+        const initialStatus = paymentMethod === 'cash' ? 'waiting_for_cash' : 'paid'
+
         const order = await Order.create({
             orderNumber,
             items: normalizedItems,
@@ -67,7 +69,8 @@ const createOrder = async (req, res) => {
 
             paymentMethod,
             notes,
-            institutionId: req.body.institutionId
+            institutionId: req.body.institutionId,
+            status: initialStatus
         })
 
         res.status(201).json(order)
