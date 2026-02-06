@@ -22,7 +22,10 @@ const createOrder = async (req, res) => {
         }).lean()
 
         if (drinks.length !== drinkIds.length) {
-            return res.status(400).json({ message: 'One or more drinks are not available' })
+            // Debugging: help identify which one is missing
+            const foundIds = drinks.map(d => d._id.toString())
+            const missing = drinkIds.filter(id => !foundIds.includes(String(id)))
+            return res.status(400).json({ message: 'One or more drinks are not available', missingIds: missing })
         }
 
         const drinkMap = new Map(drinks.map(d => [d._id.toString(), d]))
