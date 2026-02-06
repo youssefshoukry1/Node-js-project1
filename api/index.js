@@ -5,6 +5,7 @@ const cors = require('cors');
 
 const drink = require('../Routes/Drink-route');
 const order = require('../Routes/order-route');
+const { initSettings } = require('../Controlls/settings');
 
 const app = express();
 
@@ -34,14 +35,12 @@ app.use(async (req, res, next) => {
   next();
 });
 
-const { initSettings } = require('../Controlls/settings');
 // Routes
 app.use('/api/drink', drink);
 app.use('/api/order', order);
 app.use('/api/institution', require('../Routes/institution-route'));
 
 // Settings Route
-const express = require('express');
 const router = express.Router();
 const { verifyPassword, updatePasswords } = require('../Controlls/settings');
 router.post('/verify', verifyPassword);
