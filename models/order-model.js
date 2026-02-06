@@ -79,6 +79,12 @@ const OrderSchema = new mongoose.Schema({
 
   notes: {
     type: String
+  },
+
+  institutionId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Institution',
+    required: true
   }
 
 }, {

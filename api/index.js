@@ -26,5 +26,6 @@ app.use(async (req, res, next) => {
 
 app.use('/api/drink', drink);
 app.use('/api/order', order);
+app.use('/api/institution', require('../Routes/institution-route'));
 
 module.exports = app;

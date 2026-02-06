@@ -65,7 +65,8 @@ const createOrder = async (req, res) => {
             totalPrice,
 
             paymentMethod,
-            notes
+            notes,
+            institutionId: req.body.institutionId
         })
 
         res.status(201).json(order)
@@ -81,7 +82,10 @@ const createOrder = async (req, res) => {
  */
 const getAllOrders = async (req, res) => {
     try {
-        const orders = await Order.find()
+        const { institutionId } = req.query
+        const filter = institutionId ? { institutionId } : {}
+
+        const orders = await Order.find(filter)
             .sort({ createdAt: -1 })
             .lean() // faster for frontend display
         res.status(200).json(orders)
