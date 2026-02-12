@@ -20,6 +20,13 @@ const paymobService = {
      */
     getAuthToken: async () => {
         try {
+            // Validate environment variable is set
+            if (!process.env.API_PAYMOP_KEY) {
+                console.error('❌ CRITICAL: API_PAYMOP_KEY environment variable is not set!');
+                throw new Error('Paymob API key is not configured. Please set API_PAYMOP_KEY in environment variables.');
+            }
+
+            console.log('🔑 Authenticating with Paymob API...');
             const response = await axios.post(`${PAYMOB_API_URL}/auth/tokens`, {
                 api_key: process.env.API_PAYMOP_KEY
             });
@@ -68,6 +75,19 @@ const paymobService = {
      */
     getPaymentKey: async (authToken, paymobOrderId, orderData) => {
         try {
+            // Validate environment variables
+            if (!process.env.INTIGRATION_ID) {
+                console.error('❌ CRITICAL: INTIGRATION_ID environment variable is not set!');
+                throw new Error('Paymob Integration ID is not configured. Please set INTIGRATION_ID in environment variables.');
+            }
+
+            if (!process.env.iframe) {
+                console.error('❌ CRITICAL: iframe environment variable is not set!');
+                throw new Error('Paymob iframe ID is not configured. Please set iframe in environment variables.');
+            }
+
+            console.log('🎫 Generating payment key with Integration ID:', process.env.INTIGRATION_ID);
+
             const response = await axios.post(`${PAYMOB_API_URL}/acceptance/payment_keys`, {
                 auth_token: authToken,
                 amount_cents: Math.round(orderData.totalPrice * 100),

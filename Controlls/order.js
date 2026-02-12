@@ -82,13 +82,16 @@ const createOrder = async (req, res) => {
         // 🔹 PAYMOB PAYMENT FLOW (for E-Wallet, Card, etc.)
         if (paymentMethod !== 'cash') {
             console.log(`💳 Starting Paymob payment flow for order #${orderNumber}`)
+            console.log(`📋 Order Details - Total: ${totalPrice} EGP, Items: ${items.length}`)
 
             try {
                 // Step 1: Get authentication token from Paymob
+                console.log('🔑 Attempting Paymob authentication...')
                 const authToken = await paymobService.getAuthToken()
                 console.log('✅ Step 1: Authentication successful')
 
                 // Step 2: Register this order with Paymob
+                console.log('📝 Registering order with Paymob...')
                 const paymobOrderId = await paymobService.registerOrder(authToken, order)
                 console.log(`✅ Step 2: Order registered. Paymob ID: ${paymobOrderId}`)
 
@@ -97,6 +100,7 @@ const createOrder = async (req, res) => {
                 await order.save()
 
                 // Step 4: Generate payment token for the payment page
+                console.log('🎫 Generating payment token...')
                 const paymentToken = await paymobService.getPaymentKey(authToken, paymobOrderId, order)
                 console.log('✅ Step 3: Payment token generated')
 
@@ -111,9 +115,13 @@ const createOrder = async (req, res) => {
                 await Order.findByIdAndDelete(order._id)
 
                 console.error("❌ Paymob Flow Error:", paymobError.message)
+                console.error("❌ Error Stack:", paymobError.stack)
+                console.error("❌ Full Error:", JSON.stringify(paymobError, null, 2))
+
                 return res.status(500).json({
                     message: "Payment gateway error",
-                    details: paymobError.message
+                    details: paymobError.message,
+                    error: process.env.NODE_ENV === 'development' ? paymobError.stack : undefined
                 })
             }
         }
