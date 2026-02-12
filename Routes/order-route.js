@@ -3,6 +3,7 @@ const router = express.Router()
 const controller = require('../Controlls/order')
 
 router.post('/create', controller.createOrder)
+router.post('/paymob-callback', controller.paymobCallback) // Webhook
 router.get('/getAll', controller.getAllOrders)
 router.get('/:id', controller.getOrderById)
 router.put('/:id', controller.updateOrderStatus)

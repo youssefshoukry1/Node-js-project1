@@ -1,5 +1,6 @@
 const Order = require('../models/order-model')
 const Drink = require('../models/Drink-model')
+const paymobService = require('../Utility/paymob')
 
 /**
  * =========================
@@ -8,13 +9,17 @@ const Drink = require('../models/Drink-model')
  */
 const createOrder = async (req, res) => {
     try {
-        const { items, paymentMethod, notes } = req.body
+        const { items, paymentMethod, notes, institutionId } = req.body
 
         if (!items?.length) {
             return res.status(400).json({ message: 'Order must have at least one item' })
         }
 
-        // Deduplicate IDs to handle multiple items of the same drink (e.g. Small & Large of same Coffee)
+        if (!institutionId) {
+            return res.status(400).json({ message: 'Institution ID is required' })
+        }
+
+        // Deduplicate IDs to handle multiple items of the same drink
         const uniqueDrinkIds = [...new Set(items.map(i => i.drinkId))]
 
         const drinks = await Drink.find({
@@ -23,7 +28,6 @@ const createOrder = async (req, res) => {
         }).lean()
 
         if (drinks.length !== uniqueDrinkIds.length) {
-            // Debugging
             const foundIds = drinks.map(d => d._id.toString())
             const missing = uniqueDrinkIds.filter(id => !foundIds.includes(String(id)))
             return res.status(400).json({ message: 'One or more drinks are not available', missingIds: missing })
@@ -56,22 +60,53 @@ const createOrder = async (req, res) => {
             }
         })
 
-        const institutionId = req.body.institutionId
         const lastOrder = await Order.findOne({ institutionId }).sort({ orderNumber: -1 }).lean()
         const orderNumber = lastOrder ? lastOrder.orderNumber + 1 : 1
 
-        const initialStatus = paymentMethod === 'cash' ? 'waiting_for_cash' : 'paid'
+        // Initial status based on payment method
+        // 'cash' -> 'waiting_for_cash' (requires cashier confirmation)
+        // Others -> 'pending' (waiting for Paymob success callback)
+        const initialStatus = paymentMethod === 'cash' ? 'waiting_for_cash' : 'pending'
 
         const order = await Order.create({
             orderNumber,
             items: normalizedItems,
             totalPrice,
-
             paymentMethod,
             notes,
-            institutionId: req.body.institutionId,
-            status: initialStatus
+            institutionId,
+            status: initialStatus,
+            paymentStatus: 'unpaid'
         })
+
+        // Handle Paymob Payment Flow
+        if (paymentMethod !== 'cash') {
+            try {
+                const authToken = await paymobService.getAuthToken()
+                const paymobOrderId = await paymobService.registerOrder(authToken, order)
+
+                // Save Paymob ID to our DB for callback verification
+                order.paymobOrderId = paymobOrderId
+                await order.save()
+
+                const paymentToken = await paymobService.getPaymentKey(authToken, paymobOrderId, order)
+
+                return res.status(201).json({
+                    order,
+                    paymentToken,
+                    iframeId: process.env.iframe,
+                    paymentUrl: `https://egypt.paymob.com/api/acceptance/iframes/${process.env.iframe}?payment_token=${paymentToken}`
+                })
+            } catch (paymobError) {
+                // If Paymob fails, we still created the order but mark it as failed or return error
+                console.error("Paymob Flow Error:", paymobError)
+                return res.status(500).json({
+                    message: "Order created but payment gateway failed",
+                    orderId: order._id,
+                    error: paymobError.message
+                })
+            }
+        }
 
         res.status(201).json(order)
     } catch (error) {
@@ -151,10 +186,99 @@ const deleteOrder = async (req, res) => {
     }
 }
 
+const crypto = require('crypto')
+
+/**
+ * =========================
+ * PAYMOB CALLBACK (Webhook)
+ * =========================
+ */
+const paymobCallback = async (req, res) => {
+    try {
+        const { hmac } = req.query
+        const { obj } = req.body
+
+        // 1. Verify HMAC
+        const hmacSecret = process.env.PAYMOB_HMAC_SECRET
+
+        // Keys used for HMAC calculation in lexicographical order (Standard Transaction Processed Callback)
+        const keys = [
+            'amount_cents',
+            'created_at',
+            'currency',
+            'error_occured',
+            'has_parent_transaction',
+            'id',
+            'integration_id',
+            'is_3d_secure',
+            'is_auth',
+            'is_capture',
+            'is_refunded',
+            'is_standalone_payment',
+            'is_voided',
+            'order.id',
+            'owner',
+            'pending',
+            'source_data.pan',
+            'source_data.sub_type',
+            'source_data.type',
+            'success'
+        ]
+
+        let concatenatedString = ""
+        keys.forEach(key => {
+            if (key === 'order.id') {
+                concatenatedString += obj.order.id
+            } else if (key === 'source_data.pan') {
+                concatenatedString += obj.source_data.pan
+            } else if (key === 'source_data.sub_type') {
+                concatenatedString += obj.source_data.sub_type
+            } else if (key === 'source_data.type') {
+                concatenatedString += obj.source_data.type
+            } else {
+                concatenatedString += obj[key]
+            }
+        })
+
+        const calculatedHmac = crypto
+            .createHmac('sha512', hmacSecret)
+            .update(concatenatedString)
+            .digest('hex')
+
+        if (calculatedHmac !== hmac) {
+            console.error("HMAC Verification Failed")
+            return res.status(401).send('Invalid HMAC')
+        }
+
+        // 2. Check Success
+        const isSuccess = obj.success === true || obj.success === "true"
+        const paymobOrderId = obj.order.id
+
+        if (isSuccess) {
+            // Find order by its Paymob Order ID (Very precise)
+            const order = await Order.findOne({ paymobOrderId: paymobOrderId })
+
+            if (order) {
+                order.paymentStatus = 'paid'
+                order.status = 'paid' // Move to kitchen queue
+                await order.save()
+            } else {
+                console.error(`Order not found for Paymob ID: ${paymobOrderId}`)
+            }
+        }
+
+        res.status(200).send('OK')
+    } catch (error) {
+        console.error('Callback Error:', error)
+        res.status(500).send('Internal Server Error')
+    }
+}
+
 module.exports = {
     createOrder,
     getAllOrders,
     getOrderById,
     updateOrderStatus,
-    deleteOrder
+    deleteOrder,
+    paymobCallback
 }
