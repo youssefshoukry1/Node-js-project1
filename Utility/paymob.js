@@ -1,7 +1,7 @@
 const axios = require('axios');
 
-// Paymob API Base URL (Egypt)
-const PAYMOB_API_URL = 'https://egypt.paymob.com/api';
+// Paymob API Base URL (Standard)
+const PAYMOB_API_URL = 'https://accept.paymob.com/api';
 
 /**
  * Paymob Payment Gateway Service
