@@ -79,17 +79,26 @@ const createOrder = async (req, res) => {
             paymentStatus: 'unpaid'
         })
 
-        // Handle Paymob Payment Flow
+        // 🔹 PAYMOB PAYMENT FLOW (for E-Wallet, Card, etc.)
         if (paymentMethod !== 'cash') {
-            try {
-                const authToken = await paymobService.getAuthToken()
-                const paymobOrderId = await paymobService.registerOrder(authToken, order)
+            console.log(`💳 Starting Paymob payment flow for order #${orderNumber}`)
 
-                // Save Paymob ID to our DB for callback verification
+            try {
+                // Step 1: Get authentication token from Paymob
+                const authToken = await paymobService.getAuthToken()
+                console.log('✅ Step 1: Authentication successful')
+
+                // Step 2: Register this order with Paymob
+                const paymobOrderId = await paymobService.registerOrder(authToken, order)
+                console.log(`✅ Step 2: Order registered. Paymob ID: ${paymobOrderId}`)
+
+                // Step 3: Save Paymob ID to our database for tracking
                 order.paymobOrderId = paymobOrderId
                 await order.save()
 
+                // Step 4: Generate payment token for the payment page
                 const paymentToken = await paymobService.getPaymentKey(authToken, paymobOrderId, order)
+                console.log('✅ Step 3: Payment token generated')
 
                 return res.status(201).json({
                     order,
@@ -98,12 +107,13 @@ const createOrder = async (req, res) => {
                     paymentUrl: `https://egypt.paymob.com/api/acceptance/iframes/${process.env.iframe}?payment_token=${paymentToken}`
                 })
             } catch (paymobError) {
-                // If Paymob fails, we still created the order but mark it as failed or return error
-                console.error("Paymob Flow Error:", paymobError)
+                // Delete the order if payment setup failed
+                await Order.findByIdAndDelete(order._id)
+
+                console.error("❌ Paymob Flow Error:", paymobError.message)
                 return res.status(500).json({
-                    message: "Order created but payment gateway failed",
-                    orderId: order._id,
-                    error: paymobError.message
+                    message: "Payment gateway error",
+                    details: paymobError.message
                 })
             }
         }
