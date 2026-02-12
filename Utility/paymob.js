@@ -54,7 +54,7 @@ const paymobService = {
                 delivery_needed: false,
                 amount_cents: Math.round(orderData.totalPrice * 100),
                 currency: "EGP",
-                merchant_order_id: orderData._id.toString() + '_' + Date.now(), // Ensure unique ID
+                merchant_order_id: orderData._id.toString(),
                 // items: [] 
             };
             console.log('📦 sending registerOrder payload:', JSON.stringify({ ...payload, auth_token: '***' }));
