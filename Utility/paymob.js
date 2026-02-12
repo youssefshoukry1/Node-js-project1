@@ -1,7 +1,7 @@
 const axios = require('axios');
 
-// Paymob API Base URL (Egypt)
-const PAYMOB_API_URL = 'https://egypt.paymob.com/api';
+// Paymob API Base URL (Standard)
+const PAYMOB_API_URL = 'https://accept.paymob.com/api';
 
 /**
  * Paymob Payment Gateway Service
@@ -26,7 +26,10 @@ const paymobService = {
                 throw new Error('Paymob API key is not configured. Please set API_PAYMOP_KEY in environment variables.');
             }
 
-            console.log('🔑 Authenticating with Paymob API...');
+            const keyPreview = process.env.API_PAYMOP_KEY.substring(0, 10) + '...';
+            console.log(`🔑 Authenticating with Paymob API using key: ${keyPreview}`);
+            console.log(`🌐 Target URL: ${PAYMOB_API_URL}/auth/tokens`);
+
             const response = await axios.post(`${PAYMOB_API_URL}/auth/tokens`, {
                 api_key: process.env.API_PAYMOP_KEY
             });
