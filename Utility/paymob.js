@@ -49,18 +49,17 @@ const paymobService = {
      */
     registerOrder: async (authToken, orderData) => {
         try {
-            const response = await axios.post(`${PAYMOB_API_URL}/ecommerce/orders`, {
+            const payload = {
                 auth_token: authToken,
                 delivery_needed: false,
-                amount_cents: Math.round(orderData.totalPrice * 100), // Convert EGP to cents
+                amount_cents: Math.round(orderData.totalPrice * 100),
                 currency: "EGP",
-                items: orderData.items.map(item => ({
-                    name: item.title,
-                    amount_cents: Math.round(item.price * 100),
-                    description: item.size,
-                    quantity: item.quantity
-                }))
-            });
+                merchant_order_id: orderData._id.toString(),
+                // items: [] 
+            };
+            console.log('📦 sending registerOrder payload:', JSON.stringify({ ...payload, auth_token: '***' }));
+
+            const response = await axios.post(`${PAYMOB_API_URL}/ecommerce/orders`, payload);
 
             return response.data.id;
 
