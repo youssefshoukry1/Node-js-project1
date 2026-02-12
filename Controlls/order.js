@@ -80,7 +80,7 @@ const createOrder = async (req, res) => {
         })
 
         // 🔹 PAYMOB PAYMENT FLOW (for E-Wallet, Card, etc.)
-        if (paymentMethod !== 'cash') {
+        if (paymentMethod === 'paymob') {
             console.log(`💳 Starting Paymob payment flow for order #${orderNumber}`)
             console.log(`📋 Order Details - Total: ${totalPrice} EGP, Items: ${items.length}`)
 
@@ -128,7 +128,32 @@ const createOrder = async (req, res) => {
 
         res.status(201).json(order)
     } catch (error) {
-        res.status(400).json({ message: error.message })
+        console.error('❌ Order Creation Error:', error.message)
+        console.error('❌ Error Stack:', error.stack)
+
+        // Mongoose validation errors
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({
+                message: 'Validation error',
+                details: error.message,
+                errors: error.errors
+            })
+        }
+
+        // MongoDB duplicate key errors
+        if (error.code === 11000) {
+            return res.status(409).json({
+                message: 'Duplicate order detected',
+                details: error.message
+            })
+        }
+
+        // Generic error
+        res.status(500).json({
+            message: error.message,
+            type: error.name,
+            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        })
     }
 }
 

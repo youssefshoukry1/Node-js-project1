@@ -64,7 +64,7 @@ const OrderSchema = new mongoose.Schema({
 
   paymentMethod: {
     type: String,
-    enum: ['cash', 'wallet'],
+    enum: ['cash', 'paymob'],
     required: true
   },
 
