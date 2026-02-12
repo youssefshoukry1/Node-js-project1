@@ -108,7 +108,7 @@ const createOrder = async (req, res) => {
                     order,
                     paymentToken,
                     iframeId: process.env.iframe,
-                    paymentUrl: `https://egypt.paymob.com/api/acceptance/iframes/${process.env.iframe}?payment_token=${paymentToken}`
+                    paymentUrl: `https://accept.paymob.com/api/acceptance/iframes/${process.env.iframe}?payment_token=${paymentToken}`
                 })
             } catch (paymobError) {
                 // Delete the order if payment setup failed
