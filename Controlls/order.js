@@ -170,9 +170,16 @@ const getAllOrders = async (req, res) => {
         const { institutionId } = req.query
         const filter = institutionId ? { institutionId } : {}
 
+        // 🔹 FILTER: Hide 'awaiting_payment' orders.
+        // We want to show:
+        // 1. 'waiting_for_cash' (Cash orders need confirmation)
+        // 2. 'paid', 'preparing', 'ready', 'completed' (Paid online orders)
+        // 3. We DO NOT show 'awaiting_payment' (User hasn't paid via Paymob yet)
+        filter.status = { $ne: 'awaiting_payment' }
+
         const orders = await Order.find(filter)
             .sort({ createdAt: -1 })
-            .lean() // faster for frontend display
+            .lean()
         res.status(200).json(orders)
     } catch (error) {
         res.status(500).json({ message: error.message })
