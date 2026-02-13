@@ -66,7 +66,10 @@ const createOrder = async (req, res) => {
         // Initial status based on payment method
         // 'cash' -> 'waiting_for_cash' (requires cashier confirmation)
         // Others -> 'pending' (waiting for Paymob success callback)
-        const initialStatus = paymentMethod === 'cash' ? 'waiting_for_cash' : 'pending'
+        // Initial status based on payment method
+        let initialStatus = 'pending'
+        if (paymentMethod === 'cash') initialStatus = 'waiting_for_cash'
+        if (paymentMethod === 'paymob') initialStatus = 'awaiting_payment'
 
         const order = await Order.create({
             orderNumber,
@@ -295,19 +298,25 @@ const paymobCallback = async (req, res) => {
 
         // 2. Check Success
         const isSuccess = obj.success === true || obj.success === "true"
+        const isPending = obj.pending === true || obj.pending === "true"
         const paymobOrderId = obj.order.id
 
-        if (isSuccess) {
+        console.log(`🔔 Paymob Webhook: Order ${paymobOrderId}, Success: ${isSuccess}, Pending: ${isPending}`)
+
+        if (isSuccess && !isPending) {
             // Find order by its Paymob Order ID (Very precise)
             const order = await Order.findOne({ paymobOrderId: paymobOrderId })
 
             if (order) {
+                console.log(`✅ Payment confirmed for Order #${order.orderNumber}. Updating status to 'paid'.`)
                 order.paymentStatus = 'paid'
                 order.status = 'paid' // Move to kitchen queue
                 await order.save()
             } else {
                 console.error(`Order not found for Paymob ID: ${paymobOrderId}`)
             }
+        } else {
+            console.log(`ℹ️ Webhook ignored or transaction pending/failed. Success: ${isSuccess}, Pending: ${isPending}`)
         }
 
         res.status(200).send('OK')
