@@ -244,7 +244,11 @@ const paymobCallback = async (req, res) => {
         const { hmac } = req.query
         const { obj } = req.body
 
-        console.log('🔔 Paymob Callback Received')
+        console.log(`🔔 Paymob Callback Received [${req.method}]`)
+        if (req.method === 'GET') {
+            console.warn('⚠️ Received GET request. This endpoint expects a POST webhook from Paymob. If this is a redirect, it will fail to update status.')
+        }
+
         console.log('Query:', JSON.stringify(req.query))
         console.log('Body:', JSON.stringify(req.body))
 
