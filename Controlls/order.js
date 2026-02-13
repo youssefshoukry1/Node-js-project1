@@ -241,18 +241,29 @@ const crypto = require('crypto')
  */
 const paymobCallback = async (req, res) => {
     try {
-        const { hmac } = req.query
-        const { obj } = req.body
+        // 1. Extract Data based on Request Method (GET = Redirect, POST = Webhook)
+        const method = req.method
+        let data = {}
+        let hmac = ""
 
-        console.log(`🔔 Paymob Callback Received [${req.method}]`)
-        if (req.method === 'GET') {
-            console.warn('⚠️ Received GET request. This endpoint expects a POST webhook from Paymob. If this is a redirect, it will fail to update status.')
+        console.log(`🔔 Paymob Callback Received [${method}]`)
+
+        if (method === 'POST') {
+            // Webhook: Data is in body.obj
+            data = req.body.obj
+            hmac = req.query.hmac // HMAC is always in query for Webhook
+        } else if (method === 'GET') {
+            // Redirect: Data is in query params
+            hmac = req.query.hmac
+            data = req.query
         }
 
-        console.log('Query:', JSON.stringify(req.query))
-        console.log('Body:', JSON.stringify(req.body))
+        if (!data) {
+            console.error('❌ No data received in callback')
+            return res.status(400).send('No data')
+        }
 
-        // 1. Verify HMAC
+        // 2. Verify HMAC
         const hmacSecret = process.env.PAYMOB_HMAC_SECRET
         if (!hmacSecret) {
             console.error('❌ PAYMOB_HMAC_SECRET is missing!')
@@ -284,18 +295,29 @@ const paymobCallback = async (req, res) => {
 
         let concatenatedString = ""
         keys.forEach(key => {
-            let val;
-            if (key === 'order.id') val = obj.order?.id;
-            else if (key === 'source_data.pan') val = obj.source_data?.pan;
-            else if (key === 'source_data.sub_type') val = obj.source_data?.sub_type;
-            else if (key === 'source_data.type') val = obj.source_data?.type;
-            else val = obj[key];
+            let val = undefined
+
+            // Smart extraction to handle both nested (POST) and flat (GET) structures
+            if (method === 'POST') {
+                if (key === 'order.id') val = data.order?.id
+                else if (key === 'source_data.pan') val = data.source_data?.pan
+                else if (key === 'source_data.sub_type') val = data.source_data?.sub_type
+                else if (key === 'source_data.type') val = data.source_data?.type
+                else val = data[key]
+            } else {
+                // GET Query params usually have keys like 'order' (for order.id) or 'source_data.pan'
+                if (key === 'order.id') val = data.order || data['order.id']
+                else if (key === 'source_data.pan') val = data['source_data.pan']
+                else if (key === 'source_data.sub_type') val = data['source_data.sub_type']
+                else if (key === 'source_data.type') val = data['source_data.type']
+                else val = data[key]
+            }
 
             // Convert booleans to string, null/undefined to empty string
             if (val === null || val === undefined) {
-                val = "";
+                val = ""
             } else {
-                val = String(val); // Convert to string (true -> "true", false -> "false", numbers -> "123")
+                val = String(val) // true -> "true", false -> "false"
             }
 
             concatenatedString += val
@@ -310,37 +332,44 @@ const paymobCallback = async (req, res) => {
 
         if (calculatedHmac !== hmac) {
             console.error("❌ HMAC Verification Failed")
-            console.error("Input String:", concatenatedString)
-            // return res.status(401).send('Invalid HMAC') // Disabled for debugging if needed, but safer to keep active.
-            // For now, I will keep it but log heavily. If user reports "HMAC Mismatch", we know why.
+            // Strict check: return res.status(401).send('Invalid HMAC')
+            // For debugging, we might log and continue, but for production, fail.
+            // Assuming user wants strict security:
             return res.status(401).send('Invalid HMAC')
         }
 
-        // 2. Check Success
-        // Accept string "true" or boolean true
-        const isSuccess = obj.success === true || String(obj.success).toLowerCase() === "true"
-        const isPending = obj.pending === true || String(obj.pending).toLowerCase() === "true"
-        const paymobOrderId = obj.order?.id
+        // 3. Update Order Status
+        const isSuccess = data.success === true || String(data.success).toLowerCase() === "true"
+        const isPending = data.pending === true || String(data.pending).toLowerCase() === "true"
 
-        console.log(`📝 Transaction Status: Success=${isSuccess}, Pending=${isPending}, OrderID=${paymobOrderId}`)
+        // In GET/Query, order ID is usually in 'order' or 'merchant_order_id'
+        // Paymob 'order' key in the callback refers to the Paymob Order ID.
+        // We stored this as 'paymobOrderId' in our DB.
+        const paymobOrderId = method === 'POST' ? data.order?.id : (data.order || data['order.id'])
+
+        console.log(`📝 Transaction Status: Success=${isSuccess}, Pending=${isPending}, PaymobID=${paymobOrderId}`)
 
         if (isSuccess && !isPending) {
-            // Find order by its Paymob Order ID (Very precise)
             const order = await Order.findOne({ paymobOrderId: paymobOrderId })
 
             if (order) {
-                console.log(`✅ Payment confirmed for Order #${order.orderNumber}. Updating status to 'paid'.`)
-                order.paymentStatus = 'paid'
-                order.status = 'paid' // Move to kitchen queue
-                await order.save()
+                // Only update if not already paid to avoid redundant writes
+                if (order.paymentStatus !== 'paid') {
+                    console.log(`✅ Payment confirmed for Order #${order.orderNumber}. Updating status to 'paid'.`)
+                    order.paymentStatus = 'paid'
+                    order.status = 'paid' // Move to kitchen queue
+                    await order.save()
+                } else {
+                    console.log(`ℹ️ Order #${order.orderNumber} is already marked as paid.`)
+                }
             } else {
-                console.error(`❌ Order not found for Paymob ID: ${paymobOrderId} (Database mismatch?)`)
+                console.error(`❌ Order not found for Paymob ID: ${paymobOrderId}`)
             }
         } else {
             console.log(`ℹ️ Transaction not successful or still pending.`)
         }
 
-        res.status(200).send('OK')
+        return res.status(200).send('OK')
     } catch (error) {
         console.error('❌ Callback Error:', error)
         res.status(500).send('Internal Server Error')
