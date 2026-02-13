@@ -244,10 +244,17 @@ const paymobCallback = async (req, res) => {
         const { hmac } = req.query
         const { obj } = req.body
 
+        console.log('🔔 Paymob Callback Received')
+        console.log('Query:', JSON.stringify(req.query))
+        console.log('Body:', JSON.stringify(req.body))
+
         // 1. Verify HMAC
         const hmacSecret = process.env.PAYMOB_HMAC_SECRET
+        if (!hmacSecret) {
+            console.error('❌ PAYMOB_HMAC_SECRET is missing!')
+            return res.status(500).send('Configuration Error')
+        }
 
-        // Keys used for HMAC calculation in lexicographical order (Standard Transaction Processed Callback)
         const keys = [
             'amount_cents',
             'created_at',
@@ -273,17 +280,21 @@ const paymobCallback = async (req, res) => {
 
         let concatenatedString = ""
         keys.forEach(key => {
-            if (key === 'order.id') {
-                concatenatedString += obj.order.id
-            } else if (key === 'source_data.pan') {
-                concatenatedString += obj.source_data.pan
-            } else if (key === 'source_data.sub_type') {
-                concatenatedString += obj.source_data.sub_type
-            } else if (key === 'source_data.type') {
-                concatenatedString += obj.source_data.type
+            let val;
+            if (key === 'order.id') val = obj.order?.id;
+            else if (key === 'source_data.pan') val = obj.source_data?.pan;
+            else if (key === 'source_data.sub_type') val = obj.source_data?.sub_type;
+            else if (key === 'source_data.type') val = obj.source_data?.type;
+            else val = obj[key];
+
+            // Convert booleans to string, null/undefined to empty string
+            if (val === null || val === undefined) {
+                val = "";
             } else {
-                concatenatedString += obj[key]
+                val = String(val); // Convert to string (true -> "true", false -> "false", numbers -> "123")
             }
+
+            concatenatedString += val
         })
 
         const calculatedHmac = crypto
@@ -291,17 +302,23 @@ const paymobCallback = async (req, res) => {
             .update(concatenatedString)
             .digest('hex')
 
+        console.log(`🔐 HMAC Check: Received=${hmac}, Calculated=${calculatedHmac}`)
+
         if (calculatedHmac !== hmac) {
-            console.error("HMAC Verification Failed")
+            console.error("❌ HMAC Verification Failed")
+            console.error("Input String:", concatenatedString)
+            // return res.status(401).send('Invalid HMAC') // Disabled for debugging if needed, but safer to keep active.
+            // For now, I will keep it but log heavily. If user reports "HMAC Mismatch", we know why.
             return res.status(401).send('Invalid HMAC')
         }
 
         // 2. Check Success
-        const isSuccess = obj.success === true || obj.success === "true"
-        const isPending = obj.pending === true || obj.pending === "true"
-        const paymobOrderId = obj.order.id
+        // Accept string "true" or boolean true
+        const isSuccess = obj.success === true || String(obj.success).toLowerCase() === "true"
+        const isPending = obj.pending === true || String(obj.pending).toLowerCase() === "true"
+        const paymobOrderId = obj.order?.id
 
-        console.log(`🔔 Paymob Webhook: Order ${paymobOrderId}, Success: ${isSuccess}, Pending: ${isPending}`)
+        console.log(`📝 Transaction Status: Success=${isSuccess}, Pending=${isPending}, OrderID=${paymobOrderId}`)
 
         if (isSuccess && !isPending) {
             // Find order by its Paymob Order ID (Very precise)
@@ -313,15 +330,15 @@ const paymobCallback = async (req, res) => {
                 order.status = 'paid' // Move to kitchen queue
                 await order.save()
             } else {
-                console.error(`Order not found for Paymob ID: ${paymobOrderId}`)
+                console.error(`❌ Order not found for Paymob ID: ${paymobOrderId} (Database mismatch?)`)
             }
         } else {
-            console.log(`ℹ️ Webhook ignored or transaction pending/failed. Success: ${isSuccess}, Pending: ${isPending}`)
+            console.log(`ℹ️ Transaction not successful or still pending.`)
         }
 
         res.status(200).send('OK')
     } catch (error) {
-        console.error('Callback Error:', error)
+        console.error('❌ Callback Error:', error)
         res.status(500).send('Internal Server Error')
     }
 }
