@@ -69,7 +69,7 @@ const createOrder = async (req, res) => {
         // Initial status based on payment method
         let initialStatus = 'pending'
         if (paymentMethod === 'cash') initialStatus = 'waiting_for_cash'
-        if (paymentMethod === 'paymob') initialStatus = 'awaiting_payment'
+        if (paymentMethod === 'paymob') initialStatus = 'pending'
 
         const order = await Order.create({
             orderNumber,
@@ -169,13 +169,6 @@ const getAllOrders = async (req, res) => {
     try {
         const { institutionId } = req.query
         const filter = institutionId ? { institutionId } : {}
-
-        // 🔹 FILTER: Hide 'awaiting_payment' orders.
-        // We want to show:
-        // 1. 'waiting_for_cash' (Cash orders need confirmation)
-        // 2. 'paid', 'preparing', 'ready', 'completed' (Paid online orders)
-        // 3. We DO NOT show 'awaiting_payment' (User hasn't paid via Paymob yet)
-        filter.status = { $ne: 'awaiting_payment' }
 
         const orders = await Order.find(filter)
             .sort({ createdAt: -1 })
