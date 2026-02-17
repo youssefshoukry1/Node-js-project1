@@ -35,9 +35,12 @@ const verifyPassword = async (req, res) => {
         }
 
         if (isValid) {
-            return res.status(200).json({ success: true, message: 'Access Granted' })
+            // Generate JWT token for admin/owner
+            const generateJWT = require('../Utility/generate_jwt');
+            const token = generateJWT({ role: type });
+            return res.status(200).json({ success: true, message: 'Access Granted', token });
         } else {
-            return res.status(401).json({ success: false, message: 'Invalid Password' })
+            return res.status(401).json({ success: false, message: 'Invalid Password' });
         }
     } catch (error) {
         res.status(500).json({ message: error.message })
