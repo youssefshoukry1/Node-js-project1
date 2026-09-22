@@ -1,18 +1,18 @@
 const jwt = require('jsonwebtoken');
 
 const verifyToken = (req, res, next) => {
-    const authHeader = req.headers['Authorization'] || req.headers['authorization'];
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
     if (!authHeader) {
-        return res.status(404).json('token not found')
+        return res.status(401).json({ message: 'Token not provided' });
     }
-    const token = authHeader.split(' ')[1];
+    const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader;
     try {
-        const currentUser = jwt.verify(token, process.env.JWT_TOKEN)
-        req.currentUser = currentUser
-        console.log('currentU',req.currentUser);
-        next()
+        const currentUser = jwt.verify(token, process.env.JWT_TOKEN);
+        req.currentUser = currentUser;
+        next();
     } catch (err) {
-        return res.status(401).json('invalid token');
+        return res.status(401).json({ message: 'Invalid or expired token' });
     }
-}
+};
+
 module.exports = verifyToken;

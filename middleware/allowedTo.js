@@ -1,10 +1,10 @@
-module.exports = (...roles) =>{
-    console.log('roles',roles);
-    
-    return (req,res,next) => {
-        if(!roles.includes(req.currentUser.role)){
-            return res.json('this role is not authorized')
+module.exports = (...roles) => {
+    const normalizedRoles = roles.map(r => r.toUpperCase());
+    return (req, res, next) => {
+        const userRole = (req.currentUser?.role || '').toUpperCase();
+        if (userRole === 'OWNER' || normalizedRoles.includes(userRole) || (normalizedRoles.includes('MANEGER') && userRole === 'MANAGER') || (normalizedRoles.includes('MANAGER') && userRole === 'MANEGER')) {
+            return next();
         }
-            next()
-    }
-}
+        return res.status(403).json({ message: 'This role is not authorized' });
+    };
+};
